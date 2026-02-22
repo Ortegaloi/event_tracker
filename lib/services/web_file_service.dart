@@ -1,3 +1,5 @@
+// In lib/services/web_file_service.dart
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
@@ -48,6 +50,7 @@ extension ExportMethodExtension on ExportMethod {
 
 class WebFileService {
   static const String _storageKey = 'saved_birthdays';
+  static const String _assetPath = 'assets/data/event.txt';
   
   // Save to local storage (SharedPreferences for web)
   static Future<void> saveToLocal(List<Person> people) async {
@@ -82,37 +85,33 @@ class WebFileService {
     return [];
   }
   
-  // Load from assets
-  static Future<List<Person>> loadFromAssets(String assetPath) async {
-    try {
-      final String content = await rootBundle.loadString(assetPath);
-      return _parseContent(content);
-    } catch (e) {
-      debugPrint('Error loading from assets: $e');
+ static Future<List<Person>> loadFromAssets([String? assetPath]) async {
+  try {
+    // Use provided path or default
+    final path = assetPath ?? _assetPath;
+    debugPrint('Attempting to load from assets: $path');
+    
+    final String content = await rootBundle.loadString(path);
+    
+    if (content.isEmpty) {
+      debugPrint('Asset file is empty');
       return [];
     }
-  }
-  
-  // Parse content from text file
-  static List<Person> _parseContent(String content) {
-    List<Person> people = [];
-    List<String> lines = content.split('\n');
     
-    for (String line in lines) {
-      if (line.trim().isEmpty) continue;
-      
-      try {
-        final person = DateParser.parseLine(line);
-        if (person != null) {
-          people.add(person);
-        }
-      } catch (e) {
-        debugPrint('Error parsing line: $line');
-      }
-    }
+    debugPrint('✅ Successfully loaded asset: $path');
+    debugPrint('Content length: ${content.length} characters');
     
-    return DateParser.sortByDate(people);
+    // Use parseFile instead of parseLine
+    final people = DateParser.parseFile(content);
+    debugPrint('✅ Parsed ${people.length} people from file');
+    
+    return people;
+    
+  } catch (e) {
+    debugPrint('❌ Error loading from assets: $e');
+    return [];
   }
+}
   
   // Generate export content
   static String _generateExportContent(List<Person> people) {
@@ -144,9 +143,7 @@ class WebFileService {
       monthPeople.sort((a, b) => a.day.compareTo(b.day));
       
       for (var person in monthPeople) {
-        final type = person.isBirthday ? '🎂' : '❤️';
-        final day = person.day.toString().padLeft(2);
-        buffer.writeln('  $type  ${months[month - 1].substring(0, 3)} $day  │ ${person.name}');
+        buffer.writeln('  ${person.name}');
       }
     }
     
@@ -161,24 +158,13 @@ class WebFileService {
     
     buffer.writeln('Total Events: ${people.length}');
     buffer.writeln('  🎂 Birthdays: $birthdays');
-    buffer.writeln('  ❤️ Anniversaries: $anniversaries');
-    
-    // Add month counts
-    buffer.writeln();
-    buffer.writeln('Monthly Distribution:');
-    for (int month = 1; month <= 12; month++) {
-      final count = grouped[month]?.length ?? 0;
-      if (count > 0) {
-        buffer.writeln('  ${months[month - 1]}: $count');
-      }
-    }
-    
+    buffer.writeln('  💍 Anniversaries: $anniversaries');
     buffer.writeln('=' * 50);
     
     return buffer.toString();
   }
   
-  // Method 1: Download file (simplest for web)
+  // Method 1: Download file
   static Future<void> downloadFile(List<Person> people) async {
     try {
       final content = _generateExportContent(people);
@@ -200,16 +186,15 @@ class WebFileService {
     }
   }
   
-  // Method 2: Share using Web Share API (if available)
+  // Method 2: Share using Web Share API
   static Future<bool> shareViaWebShare(List<Person> people) async {
     try {
       final content = _generateExportContent(people);
       
-      // Check if Web Share API is available
       if (html.window.navigator.share != null) {
         await html.window.navigator.share({
           'title': 'Birthday & Anniversary List',
-          'text': content.substring(0, content.length > 500 ? 500 : content.length), // First 500 chars
+          'text': content.substring(0, content.length > 500 ? 500 : content.length),
         });
         return true;
       }
@@ -220,20 +205,17 @@ class WebFileService {
     }
   }
   
-  // Method 3: Share using share_plus (modern way)
+  // Method 3: Share using share_plus
   static Future<void> shareUsingSharePlus(List<Person> people) async {
     try {
       final content = _generateExportContent(people);
       
-      // Create a temporary file for sharing
       final bytes = utf8.encode(content);
       final blob = html.Blob([bytes], 'text/plain');
       final url = html.Url.createObjectUrlFromBlob(blob);
       
-      // Use share_plus for web
-      // ignore: deprecated_member_use
       await Share.shareXFiles(
-        [XFile(url, name: 'event.txt', mimeType: 'text/plain')],
+        [XFile(url, name: 'Birthday_WeddingAni_tracker.txt', mimeType: 'text/plain')],
         text: 'Birthday & Anniversary List',
         subject: 'My Birthday & Anniversary Events',
       );
@@ -247,13 +229,12 @@ class WebFileService {
     }
   }
   
-  // Method 4: Save using file_saver (user-friendly)
+  // Method 4: Save using file_saver
   static Future<void> saveWithFileSaver(List<Person> people) async {
     try {
       final content = _generateExportContent(people);
       final bytes = utf8.encode(content);
       
-      // Fixed: Using correct FileSaver parameters
       await FileSaver.instance.saveFile(
         name: 'birthday_list_${DateTime.now().millisecondsSinceEpoch}',
         bytes: bytes,
@@ -268,7 +249,7 @@ class WebFileService {
     }
   }
   
-  // Comprehensive export method with options
+  // Comprehensive export method
   static Future<void> exportData(
     List<Person> people, {
     required BuildContext context,
@@ -286,7 +267,6 @@ class WebFileService {
           if (shared) {
             _showSnackBar(context, '✅ Shared successfully');
           } else {
-            // Fallback to download
             await downloadFile(people);
             _showSnackBar(context, '✅ Web Share not available - file downloaded instead');
           }

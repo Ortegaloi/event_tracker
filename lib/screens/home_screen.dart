@@ -21,36 +21,84 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _showAnniversaries = true;
   String _searchQuery = '';
   bool _isLoading = true;
-  
+
   @override
   void initState() {
     super.initState();
     _loadData();
   }
-  
+
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     await _dataService.loadData();
     _filterPeople();
+    
+    // Debug: Print first 10 entries to verify order
+    final allPeople = _dataService.people;
+    print('\n📅 FIRST 10 ENTRIES (should be Jan to Dec):');
+    for (int i = 0; i < (allPeople.length > 10 ? 10 : allPeople.length); i++) {
+      final p = allPeople[i];
+      print('  ${p.month}/${p.day}: ${p.name}');
+    }
+    
     setState(() => _isLoading = false);
   }
+
+void _debugMonthlyOrder() {
+  print('\n' + '=' * 60);
+  print('📊 MONTHLY ORDER DEBUG');
+  print('=' * 60);
   
-  void _filterPeople() {
-    setState(() {
-      _displayedPeople = _dataService.people.where((person) {
-        // Filter by type
-        if (person.isBirthday && !_showBirthdays) return false;
-        if (person.isAnniversary && !_showAnniversaries) return false;
-        
-        // Filter by search query
-        if (_searchQuery.isNotEmpty) {
-          return person.name.toLowerCase().contains(_searchQuery.toLowerCase());
-        }
-        
-        return true;
-      }).toList();
-    });
+  if (_displayedPeople.isEmpty) {
+    print('No people to display');
+    return;
   }
+  
+  int? currentMonth;
+  for (int i = 0; i < _displayedPeople.length; i++) {
+    final person = _displayedPeople[i];
+    
+    if (currentMonth != person.month) {
+      currentMonth = person.month;
+      print('\n--- Month ${person.month} ---');
+    }
+    
+    // Check if order is wrong
+    if (i > 0) {
+      final prev = _displayedPeople[i-1];
+      if (prev.month > person.month) {
+        print('❌ ERROR: ${prev.month} comes after ${person.month}');
+      } else if (prev.month == person.month && prev.day > person.day) {
+        print('❌ ERROR: Day ${prev.day} comes after ${person.day}');
+      }
+    }
+    
+    print('  Day ${person.day.toString().padLeft(2)}: ${person.name}');
+  }
+  
+  print('\n' + '=' * 60);
+}
+
+void _filterPeople() {
+  setState(() {
+    _displayedPeople = _dataService.people.where((person) {
+      if (person.isBirthday && !_showBirthdays) return false;
+      if (person.isAnniversary && !_showAnniversaries) return false;
+      if (_searchQuery.isNotEmpty) {
+        return person.name.toLowerCase().contains(_searchQuery.toLowerCase());
+      }
+      return true;
+    }).toList();
+    
+    _displayedPeople.sort((a, b) {
+      if (a.month != b.month) return a.month.compareTo(b.month);
+      return a.day.compareTo(b.day);
+    });
+  });
+  
+  // Add debug here
+  _debugMonthlyOrder();
+}
   
   @override
   Widget build(BuildContext context) {
@@ -121,8 +169,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : _displayedPeople.isEmpty
-              ? Center(
-                  child: Column(
+              ? Center( child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.event_busy, size: 64, color: Colors.grey),

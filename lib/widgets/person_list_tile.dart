@@ -10,13 +10,9 @@ class PersonListTile extends StatelessWidget {
   final VoidCallback? onDelete;
   final bool showTypeIcon;
   
-  const PersonListTile({
-    Key? key,
-    required this.person,
-    this.onTap,
-    this.onDelete,
-    this.showTypeIcon = true,
-  }) : super(key: key);
+
+  const PersonListTile({super.key, required this.person, 
+  this.onTap, this.onDelete, this.showTypeIcon = true});
   
   @override
   Widget build(BuildContext context) {
@@ -57,9 +53,9 @@ class PersonListTile extends StatelessWidget {
           Container(
             padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
+              color: iconColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: iconColor.withOpacity(0.3)),
+              border: Border.all(color: iconColor.withValues(alpha: 0.3)),
             ),
             child: Text(
               '${person.day}',
