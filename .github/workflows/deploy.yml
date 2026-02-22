@@ -6,21 +6,28 @@ on:
       - main
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4   # Updated to latest version (v3 → v4 is fine & safer)
 
-      - uses: subosito/flutter-action@v2
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.35.4
+          flutter-version: 3.35.4 
+          channel: 'stable'
 
-      - run: flutter pub get
-      - run: flutter build web
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build web app
+        run: flutter build web --release --base-href "/event_tracker/"
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4   # Updated to v4 (latest as of 2026)
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: build/web
+          publish_dir: ./build/web
+          # Optional: clean old files before deploy (recommended for clean deploys)
+          force_orphan: true
